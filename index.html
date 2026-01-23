@@ -31,8 +31,8 @@
     <div class="max-w-7xl mx-auto p-2">
         <header class="bg-indigo-900 text-white rounded-2xl p-5 shadow-lg mb-4 flex justify-between items-center">
             <div>
-                <h1 class="text-lg sm:text-xl font-black uppercase tracking-tight italic text-amber-400">Estoque de Calçados - ACA</h1>
-                <p id="statusNuvem" class="text-indigo-300 text-[10px] font-bold uppercase tracking-widest">Conectando...</p>
+                <h1 class="text-lg sm:text-xl font-black uppercase italic text-amber-400">Estoque de Calçados - ACA</h1>
+                <p id="statusNuvem" class="text-indigo-300 text-[10px] font-bold uppercase tracking-widest text-white">Sincronizando...</p>
             </div>
             <button onclick="toggleOrcamento()" class="bg-white text-indigo-900 px-4 py-2 rounded-xl font-black shadow-md flex items-center gap-2 text-sm">
                 🛒 Carrinho (<span id="cartCount">0</span>)
@@ -49,10 +49,10 @@
 
         <div class="bg-white rounded-2xl shadow-xl border overflow-hidden hidden" id="tableContainer">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200" id="mainTable">
+                <table class="min-w-full divide-y divide-slate-200">
                     <thead class="bg-slate-100">
                         <tr>
-                            <th class="px-3 py-4 text-left text-[10px] font-black text-slate-500 uppercase whitespace-nowrap">NCE</th>
+                            <th class="px-3 py-4 text-left text-[10px] font-black text-slate-500 uppercase">NCE</th>
                             <th class="px-3 py-4 text-left text-[10px] font-black text-slate-500 uppercase">Tam</th>
                             <th class="px-3 py-4 text-left text-[10px] font-black text-slate-500 uppercase">Mercadoria / Cor</th>
                             <th class="px-3 py-4 text-center text-[10px] font-black text-slate-500 uppercase">Estoque</th>
@@ -74,14 +74,14 @@
                 <div id="pdfArea" class="flex-1 overflow-y-auto">
                     <div id="orcamentoItens" class="space-y-3"></div>
                     <div class="mt-6 border-t-2 pt-4 flex justify-between items-center">
-                        <span class="font-black text-slate-500">TOTAL:</span>
+                        <span class="font-black text-slate-500 uppercase">TOTAL:</span>
                         <span id="totalOrcamento" class="text-2xl font-black text-indigo-900">R$ 0,00</span>
                     </div>
                 </div>
                 <div class="mt-6 grid grid-cols-2 gap-2">
-                    <button onclick="enviarWhatsApp()" class="col-span-2 bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors text-sm tracking-widest italic">ENVIAR WHATSAPP</button>
+                    <button onclick="enviarWhatsApp()" class="col-span-2 bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg">WHATSAPP</button>
                     <button onclick="gerarPDF()" class="bg-slate-800 text-white font-bold py-3 rounded-xl uppercase text-xs">PDF</button>
-                    <button onclick="limparOrcamento()" class="bg-slate-100 text-slate-400 font-bold py-3 rounded-xl uppercase text-[10px]">Limpar Tudo</button>
+                    <button onclick="limparOrcamento()" class="bg-slate-100 text-slate-400 font-bold py-3 rounded-xl uppercase text-[10px]">Limpar</button>
                 </div>
             </div>
         </div>
@@ -109,20 +109,34 @@
                 const lines = event.target.result.split('\n');
                 let prods = [];
                 let ultimoNCE = "";
+
                 lines.forEach(line => {
                     const clean = line.replace('@', '').replace('\r', '');
-                    if (clean.includes('====') || clean.includes('Descricao') || clean.trim().length < 50) return;
+                    
+                    // FILTRO DE LIMPEZA REFORÇADO:
+                    const upperClean = clean.toUpperCase();
+                    if (upperClean.includes('RELACAO') || 
+                        upperClean.includes('ALMOXARIFADO') || 
+                        upperClean.includes('======') || 
+                        upperClean.includes('PAG :') || 
+                        upperClean.includes('DESCRICAO') ||
+                        clean.trim().length < 50) return;
+
                     let nce = clean.substring(6, 13).trim();
                     let tam = clean.substring(13, 18).trim();
                     let cor = clean.substring(18, 39).trim();
                     let desc = clean.substring(39, 86).trim(); 
                     let saldo = clean.substring(86, 97).trim(); 
                     let preco = clean.substring(107, 118).trim();
+
                     if (nce && !isNaN(nce)) ultimoNCE = nce;
-                    if (desc.length > 5 && preco !== "") {
+                    
+                    // Só adiciona se o saldo for um número válido (evita NaN)
+                    if (desc.length > 5 && preco !== "" && !isNaN(parseFloat(saldo.replace(',','.')))) {
                         prods.push({ nce: ultimoNCE, tam, cor, desc, saldo, preco });
                     }
                 });
+
                 const agora = new Date().toLocaleString('pt-br');
                 await window.setDoc(window.doc(window.db, "estoque", "atual"), { lista: prods, data: agora });
                 location.reload();
@@ -135,24 +149,24 @@
             body.innerHTML = '';
             produtos.forEach((p) => {
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 transition-all border-b border-slate-50";
+                tr.className = "hover:bg-slate-50 border-b border-slate-50";
+                
                 const estoqueNum = Math.floor(parseFloat(p.saldo.replace(',','.')));
                 const estoqueCor = estoqueNum > 0 ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-500';
+
                 tr.innerHTML = `
-                    <td class="px-3 py-4 font-black text-indigo-700 text-[13px] whitespace-nowrap">${p.nce}</td>
+                    <td class="px-3 py-4 font-black text-indigo-700 text-[13px]">${p.nce}</td>
                     <td class="px-3 py-4 font-black text-slate-800 text-sm tam-col">${p.tam}</td>
-                    <td class="px-3 py-4 desc-col">
+                    <td class="px-3 py-4">
                         <div class="font-black text-[13px] uppercase text-slate-900 leading-tight">${p.desc}</div>
                         <div class="text-[13px] font-black uppercase text-red-600 mt-1">${p.cor}</div>
                     </td>
                     <td class="px-3 py-4 text-center">
-                        <span class="${estoqueCor} px-3 py-1 rounded-lg font-black text-xs">
-                            ${estoqueNum}
-                        </span>
+                        <span class="${estoqueCor} px-3 py-1 rounded-lg font-black text-xs">${estoqueNum}</span>
                     </td>
-                    <td class="px-3 py-4 text-right font-black text-indigo-950 text-sm whitespace-nowrap">R$ ${p.preco}</td>
+                    <td class="px-3 py-4 text-right font-black text-indigo-950 text-sm">R$ ${p.preco}</td>
                     <td class="px-3 py-4 text-center">
-                        <button onclick="addOrcamento('${p.nce}', '${p.desc}', '${p.tam}', '${p.preco}')" class="bg-indigo-600 text-white w-9 h-9 rounded-xl font-bold shadow-sm active:scale-90">+</button>
+                        <button onclick="addOrcamento('${p.nce}', '${p.desc}', '${p.tam}', '${p.preco}')" class="bg-indigo-600 text-white w-9 h-9 rounded-xl font-bold shadow-sm">+</button>
                     </td>
                 `;
                 body.appendChild(tr);
@@ -160,6 +174,7 @@
             document.getElementById('tableContainer').classList.remove('hidden');
         }
 
+        // Filtro de Busca
         document.getElementById('searchInput').addEventListener('input', function() {
             let val = this.value.toLowerCase().trim();
             const rows = document.querySelectorAll('#tableBody tr');
@@ -192,10 +207,10 @@
                 if (item.preco.includes('.')) v /= 100;
                 total += v * item.qtd;
                 container.innerHTML += `
-                    <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center shadow-sm text-[11px]">
-                        <div class="max-w-[65%]">
-                            <p class="font-black uppercase text-slate-700 leading-tight">${item.desc}</p>
-                            <p class="text-indigo-600 font-bold mt-1 uppercase text-[9px]">Tamanho: ${item.tam} | R$ ${item.preco}</p>
+                    <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-[11px]">
+                        <div>
+                            <p class="font-black uppercase">${item.desc}</p>
+                            <p class="text-indigo-600 font-bold">T: ${item.tam} | R$ ${item.preco}</p>
                         </div>
                         <div class="flex items-center gap-2">
                             <button onclick="alterarQtd(${index}, -1)" class="w-8 h-8 bg-white border rounded-lg font-black">-</button>
@@ -205,9 +220,7 @@
                     </div>`;
             });
             document.getElementById('totalOrcamento').textContent = `R$ ${total.toLocaleString('pt-br', {minimumFractionDigits: 2})}`;
-            localStorage.setItem('orcamento_aca', JSON.stringify(orcamento));
         }
-
         function alterarQtd(i, d) { orcamento[i].qtd += d; if (orcamento[i].qtd <= 0) orcamento.splice(i, 1); atualizarCarrinho(); }
         function toggleOrcamento() { document.getElementById('orcamentoModal').classList.toggle('hidden'); }
         function limparOrcamento() { if(confirm("Zerar orçamento?")) { orcamento = []; atualizarCarrinho(); } }
@@ -218,8 +231,6 @@
             msg += `\n*TOTAL: ${document.getElementById('totalOrcamento').textContent}*`;
             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`);
         }
-        const salvo = localStorage.getItem('orcamento_aca');
-        if (salvo) { orcamento = JSON.parse(salvo); atualizarCarrinho(); }
     </script>
 </body>
 </html>
