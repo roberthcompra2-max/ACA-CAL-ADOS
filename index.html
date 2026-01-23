@@ -145,7 +145,10 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50 border-b border-slate-50";
                 const estoqueNum = Math.floor(parseFloat(p.saldo.replace(',','.')));
-                const estoqueCor = estoqueNum > 0 ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-500';
+                
+                // AJUSTE DE VISIBILIDADE DO SALDO:
+                const estoqueCor = estoqueNum > 0 ? 'bg-emerald-600 text-white shadow-sm' : 'bg-red-600 text-white';
+                
                 tr.innerHTML = `
                     <td class="px-3 py-4 font-black text-indigo-700 text-[13px]">${p.nce}</td>
                     <td class="px-3 py-4 font-black text-slate-800 text-sm tam-col">${p.tam}</td>
@@ -153,10 +156,14 @@
                         <div class="font-black text-[13px] uppercase text-slate-900 leading-tight">${p.desc}</div>
                         <div class="text-[13px] font-black uppercase text-red-600 mt-1">${p.cor}</div>
                     </td>
-                    <td class="px-3 py-4 text-center"><span class="${estoqueCor} px-3 py-1 rounded-lg font-black text-xs">${estoqueNum}</span></td>
+                    <td class="px-3 py-4 text-center">
+                        <span class="${estoqueCor} px-4 py-1.5 rounded-lg font-black text-sm inline-block min-w-[45px] transition-all">
+                            ${estoqueNum}
+                        </span>
+                    </td>
                     <td class="px-3 py-4 text-right font-black text-indigo-950 text-sm">R$ ${p.preco}</td>
                     <td class="px-3 py-4 text-center">
-                        <button onclick="addOrcamento('${p.nce}', '${p.desc}', '${p.tam}', '${p.preco}', '${p.cor}')" class="bg-indigo-600 text-white w-9 h-9 rounded-xl font-bold shadow-sm active:scale-90">+</button>
+                        <button onclick="addOrcamento('${p.nce}', '${p.desc}', '${p.tam}', '${p.preco}', '${p.cor}')" class="bg-indigo-600 text-white w-10 h-10 rounded-xl font-bold shadow-md active:scale-90">+</button>
                     </td>
                 `;
                 body.appendChild(tr);
@@ -188,14 +195,11 @@
             const container = document.getElementById('orcamentoItens');
             container.innerHTML = '';
             let totalGeral = 0;
-
             orcamento.forEach((item, index) => {
                 let valorUnitario = parseFloat(item.preco.replace(/\./g, '').replace(',', '.'));
                 if (item.preco.includes('.')) valorUnitario /= 100;
-                
                 let valorSubtotal = valorUnitario * item.qtd;
                 totalGeral += valorSubtotal;
-
                 container.innerHTML += `
                     <div class="bg-white p-4 rounded-xl border-2 border-slate-100 shadow-sm">
                         <div class="flex justify-between items-start mb-2">
@@ -223,21 +227,17 @@
             });
             document.getElementById('totalOrcamento').textContent = `R$ ${totalGeral.toLocaleString('pt-br', {minimumFractionDigits: 2})}`;
         }
-
         function alterarQtd(i, d) { orcamento[i].qtd += d; if (orcamento[i].qtd <= 0) orcamento.splice(i, 1); atualizarCarrinho(); }
         function toggleOrcamento() { document.getElementById('orcamentoModal').classList.toggle('hidden'); }
         function limparOrcamento() { if(confirm("Zerar orçamento?")) { orcamento = []; atualizarCarrinho(); } }
         function gerarPDF() { html2pdf().from(document.getElementById('pdfArea')).save('Orcamento_ACA.pdf'); }
-        
         function enviarWhatsApp() {
             let msg = "*ORÇAMENTO DE CALÇADOS - ACA*\n----------------------------------\n";
             orcamento.forEach(i => {
                 let unit = parseFloat(i.preco.replace(/\./g, '').replace(',', '.'));
                 if (i.preco.includes('.')) unit /= 100;
                 let sub = unit * i.qtd;
-                msg += `✅ *${i.qtd}x ${i.desc}*\n`;
-                msg += `🎨 COR: ${i.cor} | TAM: ${i.tam}\n`;
-                msg += `💰 UNIT: R$ ${unit.toLocaleString('pt-br', {minimumFractionDigits: 2})} | SUB: R$ ${sub.toLocaleString('pt-br', {minimumFractionDigits: 2})}\n\n`;
+                msg += `✅ *${i.qtd}x ${i.desc}*\n🎨 COR: ${i.cor} | TAM: ${i.tam}\n💰 UNIT: R$ ${unit.toLocaleString('pt-br', {minimumFractionDigits: 2})} | SUB: R$ ${sub.toLocaleString('pt-br', {minimumFractionDigits: 2})}\n\n`;
             });
             msg += `----------------------------------\n*TOTAL GERAL: ${document.getElementById('totalOrcamento').textContent}*`;
             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`);
