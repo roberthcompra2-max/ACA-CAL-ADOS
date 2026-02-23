@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ACA - Estoque Corrigido</title>
+    <title>ACA - Controle de Estoque</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -16,7 +16,31 @@
         .custom-scroll::-webkit-scrollbar { display: none; }
         .group-bg-1 { background-color: #ffffff; }
         .group-bg-2 { background-color: #e2e8f0; } 
-        @media print { .no-print { display: none !important; } header { display: none !important; } }
+
+        /* AJUSTES DE IMPRESSÃO - PRETO E BRANCO TOTAL */
+        @media print { 
+            .no-print { display: none !important; } 
+            header { display: none !important; }
+            body { background: white !important; color: black !important; padding-bottom: 0 !important; }
+            table { border-collapse: collapse !important; width: 100% !important; margin-top: 0 !important; }
+            thead th { 
+                background: white !important; 
+                color: black !important; 
+                border: 1px solid black !important;
+                font-weight: bold !important;
+                position: static !important;
+            }
+            td { 
+                border: 1px solid black !important; 
+                color: black !important; 
+                background: white !important;
+                padding: 4px !important;
+            }
+            /* Garante que tudo saia preto no papel */
+            .text-indigo-700, .text-red-600, .text-red-700, .text-indigo-900, .text-slate-900, .text-emerald-600 {
+                color: black !important;
+            }
+        }
     </style>
 </head>
 <body class="pb-8">
@@ -25,7 +49,7 @@
         <div class="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-[280px] text-center border-t-4 border-amber-400">
             <h1 class="text-lg font-black text-slate-900 mb-1 uppercase tracking-tighter">ACA ESTOQUE</h1>
             <p class="text-[10px] text-slate-400 font-bold mb-4 uppercase">Acesso Restrito</p>
-            <input type="password" id="passInput" placeholder="Senha" class="w-full p-2.5 bg-slate-100 rounded-xl border border-slate-200 mb-3 font-bold text-center outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            <input type="password" id="passInput" placeholder="Senha" class="w-full p-2.5 bg-slate-100 rounded-xl border border-slate-200 mb-3 font-bold text-center outline-none text-sm">
             <button onclick="verificarLogin()" class="w-full bg-indigo-950 text-white font-black py-2.5 rounded-xl uppercase text-xs tracking-widest active:scale-95 transition-all shadow-lg">Entrar</button>
         </div>
     </div>
@@ -37,6 +61,7 @@
                     <h1 id="brandName" class="text-xs font-black italic uppercase tracking-tighter">ACA <span class="text-amber-400">ESTOQUE</span></h1>
                     <div id="tituloAmostraCentral" class="hidden absolute left-1/2 -translate-x-1/2 text-sm font-black text-amber-400 tracking-[0.2em] uppercase">AMOSTRAS</div>
                     <div class="flex gap-1.5">
+                        <button onclick="window.print()" class="bg-slate-700 text-white px-2 py-1 rounded-md font-black text-[9px] uppercase hover:bg-slate-600">🖨️ IMPRIMIR</button>
                         <button onclick="gerarAmostras()" id="btnAmostra" class="bg-cyan-600 text-white px-2 py-1 rounded-md font-black text-[9px] uppercase">📋 AMOSTRAS</button>
                         <label class="bg-amber-400 text-indigo-950 px-2 py-1 rounded-md cursor-pointer font-black text-[9px] uppercase">
                             ATUALIZAR <input type="file" id="fileInput" accept=".txt" class="hidden" />
@@ -59,7 +84,7 @@
                         <input type="number" id="minPrice" oninput="aplicarFiltrosComDebounce()" placeholder="Mín R$" class="w-1/2 p-1.5 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-[10px] outline-none" />
                         <input type="number" id="maxPrice" oninput="aplicarFiltrosComDebounce()" placeholder="Máx R$" class="w-1/2 p-1.5 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-[10px] outline-none" />
                     </div>
-                    <input type="text" id="searchInput" oninput="aplicarFiltrosComDebounce()" placeholder="Busca... (TAM:35 ou COR:PRETO)" class="flex-1 p-1.5 rounded-lg bg-slate-900/60 border border-indigo-400/30 text-white font-bold text-[10px] outline-none focus:border-amber-400" />
+                    <input type="text" id="searchInput" oninput="aplicarFiltrosComDebounce()" placeholder="Busca... (TAM:35 ou COR:PRETO)" class="flex-1 p-1.5 rounded-lg bg-slate-900/60 border border-indigo-400/30 text-white font-bold text-[10px] outline-none" />
                 </div>
 
                 <div class="flex gap-1 overflow-x-auto pb-1 custom-scroll items-center">
@@ -72,10 +97,6 @@
                     <button id="btnPecaUnica" onclick="filtrarQtd('exato', 1, this)" class="btn-qtd flex-shrink-0 bg-indigo-500/40 text-white px-3 py-1.5 rounded-md text-[8px] font-black uppercase">Peça Única</button>
                     <button id="btnMaisDois" onclick="filtrarQtd('min', 2, this)" class="btn-qtd flex-shrink-0 bg-emerald-600/40 text-white px-3 py-1.5 rounded-md text-[8px] font-black uppercase">+2 Pares</button>
                     <button onclick="limparTudo()" class="ml-auto bg-red-500/30 text-white px-2 py-1.5 rounded-md text-[8px] font-black uppercase">Limpar</button>
-                </div>
-                
-                <div class="text-[7px] text-indigo-300 uppercase font-bold text-right italic opacity-70">
-                    ATUALIZAÇÃO: <span id="lastSync" class="text-white">--/--</span>
                 </div>
             </div>
         </header>
@@ -105,7 +126,6 @@
         let valorFiltroQtd = 0;
         let timerBusca;
 
-        // FUNÇÃO DE FLUIDEZ: Debounce
         function aplicarFiltrosComDebounce() {
             clearTimeout(timerBusca);
             timerBusca = setTimeout(aplicarFiltros, 250);
@@ -132,9 +152,7 @@
         function gerarAmostras() {
             modoAmostra = !modoAmostra;
             document.getElementById('btnAmostra').textContent = modoAmostra ? "⬅️ ESTOQUE" : "📋 AMOSTRAS";
-            document.getElementById('btnPecaUnica').textContent = modoAmostra ? "Único Par" : "Peça Única";
             document.getElementById('tituloAmostraCentral').classList.toggle('hidden', !modoAmostra);
-            document.getElementById('brandName').classList.toggle('opacity-0', modoAmostra);
             document.getElementById('areaPrecos').classList.toggle('hidden', modoAmostra);
             document.getElementById('labelPares').textContent = modoAmostra ? "MODELOS:" : "PARES:";
             aplicarFiltros();
@@ -157,8 +175,7 @@
 
         function aplicarFiltros() {
             let buscaFull = document.getElementById('searchInput').value.toUpperCase();
-            let filtroTam = null;
-            let filtroCor = null;
+            let filtroTam = null, filtroCor = null;
             
             if (buscaFull.includes('TAM:')) {
                 const partes = buscaFull.split('TAM:');
@@ -189,6 +206,7 @@
                 return matchTexto && matchPreco && matchAno && matchTam && matchCor && i.total > 0;
             });
 
+            // Lógica de agrupamento por modelo para filtro de quantidade
             const somaPorNCE = {};
             listaBase.forEach(item => {
                 if (!somaPorNCE[item.nce]) somaPorNCE[item.nce] = 0;
@@ -223,10 +241,7 @@
             document.getElementById('tableHeader').innerHTML = `<tr><th class="w-14">NCE</th><th class="w-8">TAM</th><th class="text-left">DESCRIÇÃO / COR</th><th class="w-14">ESTOQUE</th><th class="w-20 text-right pr-2">PREÇO</th></tr>`;
             let html = "", ultimoNCE = "", currentClass = "group-bg-1";
             
-            // FUNÇÃO DE FLUIDEZ: Renderizar apenas os primeiros 500 para não travar o celular
-            const listaVisual = lista.slice(0, 500);
-
-            listaVisual.forEach(i => {
+            lista.forEach(i => {
                 if (i.nce !== ultimoNCE) { currentClass = (currentClass === "group-bg-1") ? "group-bg-2" : "group-bg-1"; ultimoNCE = i.nce; }
                 html += `<tr class="${currentClass} border-b border-slate-100">
                     <td class="p-2 text-center font-bold text-indigo-700">${i.nce}</td>
@@ -235,8 +250,8 @@
                         <div class="font-bold text-slate-800 uppercase text-[9px] leading-tight">${i.desc}</div>
                         <div class="text-red-600 text-[8px] font-black uppercase">${i.cor}</div>
                     </td>
-                    <td class="p-2 text-center font-black text-emerald-600">${i.total}</td>
-                    <td class="p-2 text-right font-bold pr-2 font-mono text-indigo-900">R$ ${i.unitario.toFixed(2)}</td>
+                    <td class="p-2 text-center font-black text-slate-900">${i.total}</td>
+                    <td class="p-2 text-right pr-2 font-mono text-indigo-900 font-bold">R$ ${i.unitario.toFixed(2)}</td>
                 </tr>`;
             });
             document.getElementById('tableBody').innerHTML = html;
@@ -246,10 +261,7 @@
             document.getElementById('tableHeader').innerHTML = `<tr><th class="w-14">NCE</th><th class="text-left">DESCRIÇÃO / COR</th><th class="w-10 text-center">TAM</th><th class="w-10 text-center">TOT</th><th class="w-20 text-right pr-2">VALOR</th></tr>`;
             let html = "", ultimoNCE = "", currentClass = "group-bg-1";
             
-            // FUNÇÃO DE FLUIDEZ: Renderizar apenas os primeiros 500
-            const listaVisual = lista.slice(0, 500);
-
-            listaVisual.forEach(i => {
+            lista.forEach(i => {
                 if (i.nce !== ultimoNCE) { currentClass = (currentClass === "group-bg-1") ? "group-bg-2" : "group-bg-1"; ultimoNCE = i.nce; }
                 html += `<tr class="${currentClass} border-b border-slate-200">
                     <td class="p-3 text-center font-bold text-indigo-900">${i.nce}</td>
@@ -258,16 +270,14 @@
                         <div class="text-red-700 text-[8px] font-black uppercase">${i.cor}</div>
                     </td>
                     <td class="p-3 text-center"><span class="bg-amber-100 px-2 py-0.5 rounded-full font-black text-[9px]">${i.tam}</span></td>
-                    <td class="p-3 text-center font-bold text-slate-600 text-[9px]">${i.qtdTotalCor}</td>
-                    <td class="p-3 text-right font-black text-indigo-900 pr-2 font-mono text-[10px]">R$ ${i.unitario.toFixed(2)}</td>
+                    <td class="p-3 text-center font-black text-slate-900 text-[9px]">${i.qtdTotalCor}</td>
+                    <td class="p-3 text-right pr-2 font-mono text-[10px] text-indigo-900 font-black">R$ ${i.unitario.toFixed(2)}</td>
                 </tr>`;
             });
             document.getElementById('tableBody').innerHTML = html;
         }
 
         function atualizarResumo(lista, isAmostra) {
-            // Aqui NÃO usamos o slice(0,500), pois queremos a soma do ESTOQUE REAL COMPLETO
-            // Independente de quantas linhas aparecem na tela, o valor no topo será o total absoluto.
             let p = 0, v = 0;
             if(isAmostra) { 
                 p = lista.length; 
