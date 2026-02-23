@@ -59,7 +59,7 @@
                         <input type="number" id="minPrice" oninput="aplicarFiltros()" placeholder="Mín R$" class="w-1/2 p-1.5 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-[10px] outline-none" />
                         <input type="number" id="maxPrice" oninput="aplicarFiltros()" placeholder="Máx R$" class="w-1/2 p-1.5 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-[10px] outline-none" />
                     </div>
-                    <input type="text" id="searchInput" oninput="aplicarFiltros()" placeholder="Buscar produto..." class="flex-1 p-1.5 rounded-lg bg-slate-900/60 border border-indigo-400/30 text-white font-bold text-[10px] outline-none focus:border-amber-400" />
+                    <input type="text" id="searchInput" oninput="aplicarFiltros()" placeholder="Busca... (TAM:35 ou COR:PRETO)" class="flex-1 p-1.5 rounded-lg bg-slate-900/60 border border-indigo-400/30 text-white font-bold text-[10px] outline-none focus:border-amber-400" />
                 </div>
 
                 <div class="flex gap-1 overflow-x-auto pb-1 custom-scroll items-center">
@@ -149,21 +149,52 @@
         }
 
         function aplicarFiltros() {
-            const buscaInput = document.getElementById('searchInput').value.toLowerCase();
-            const termosBusca = buscaInput.split(' ').filter(t => t !== '');
-            const minP = modoAmostra ? 0 : (parseFloat(document.getElementById('minPrice').value) || 0);
-            const maxP = modoAmostra ? Infinity : (parseFloat(document.getElementById('maxPrice').value) || Infinity);
+            let buscaFull = document.getElementById('searchInput').value.toUpperCase();
+            
+            // Lógica robusta para TAM: e COR:
+            let filtroTam = null;
+            let filtroCor = null;
+            
+            if (buscaFull.includes('TAM:')) {
+                // Pega o que vem depois de TAM: até o próximo espaço
+                const partes = buscaFull.split('TAM:');
+                if(partes[1]) filtroTam = partes[1].split(' ')[0].trim();
+            }
+            
+            if (buscaFull.includes('COR:')) {
+                const partes = buscaFull.split('COR:');
+                if(partes[1]) filtroCor = partes[1].split(' ')[0].trim();
+            }
 
-            // 1. Filtro base
+            // Remove as tags da busca de texto para não dar conflito
+            let buscaTexto = buscaFull.replace(/TAM:\S+/g, '').replace(/COR:\S+/g, '').trim().toLowerCase();
+            const termos = buscaTexto.split(' ').filter(t => t !== '');
+
+            const minP = parseFloat(document.getElementById('minPrice').value) || 0;
+            const maxP = parseFloat(document.getElementById('maxPrice').value) || Infinity;
+
+            // Filtro Principal
             let listaBase = dadosEstoque.filter(i => {
-                const stringItem = (i.desc + (i.nce||'') + (i.cor||'') + (i.tam||'')).toLowerCase();
-                const matchBusca = termosBusca.every(termo => stringItem.includes(termo));
+                const tamItem = String(i.tam || '').trim().toUpperCase();
+                const corItem = String(i.cor || '').trim().toUpperCase();
+                const descItem = String(i.desc || '').toLowerCase();
+                const nceItem = String(i.nce || '').toLowerCase();
+
+                // 1. Match de Texto (Desc ou NCE ou Cor)
+                const matchTexto = termos.every(t => descItem.includes(t) || nceItem.includes(t) || corItem.toLowerCase().includes(t));
+                
+                // 2. Match de Preço e Ano
                 const matchPreco = i.unitario >= minP && i.unitario <= maxP;
                 const matchAno = anoAtivo ? i.ano === anoAtivo : true;
-                return matchBusca && matchPreco && matchAno && i.total > 0;
+                
+                // 3. Match Específico de TAM e COR (Usa IGUALDADE para tamanho)
+                const matchTam = filtroTam ? (tamItem === filtroTam) : true;
+                const matchCor = filtroCor ? corItem.includes(filtroCor) : true;
+
+                return matchTexto && matchPreco && matchAno && matchTam && matchCor && i.total > 0;
             });
 
-            // 2. Cálculo da soma por NCE para o filtro inteligente de Peça Única
+            // Lógica Peça Única por NCE
             const somaPorNCE = {};
             listaBase.forEach(item => {
                 if (!somaPorNCE[item.nce]) somaPorNCE[item.nce] = 0;
@@ -185,13 +216,12 @@
                 renderAmostras(listaAmostras);
                 atualizarResumo(listaAmostras, true);
             } else {
-                // Filtro Peça Única agora checa o estoque TOTAL do modelo (NCE)
-                let listaFiltradaEstoque = listaBase.filter(i => {
-                    const totalDoModelo = somaPorNCE[i.nce];
-                    return modoFiltroQtd === 'exato' ? totalDoModelo === valorFiltroQtd : totalDoModelo >= valorFiltroQtd;
+                let listaFinal = listaBase.filter(i => {
+                    const totalModelo = somaPorNCE[i.nce];
+                    return modoFiltroQtd === 'exato' ? totalModelo === valorFiltroQtd : totalModelo >= valorFiltroQtd;
                 });
-                renderEstoque(listaFiltradaEstoque);
-                atualizarResumo(listaFiltradaEstoque, false);
+                renderEstoque(listaFinal);
+                atualizarResumo(listaFinal, false);
             }
         }
 
