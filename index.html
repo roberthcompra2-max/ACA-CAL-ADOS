@@ -56,10 +56,10 @@
 
                 <div class="flex gap-1.5 mb-2">
                     <div id="areaPrecos" class="flex gap-1.5 w-1/2">
-                        <input type="number" id="minPrice" oninput="aplicarFiltros()" placeholder="Mín R$" class="w-1/2 p-1.5 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-[10px] outline-none" />
-                        <input type="number" id="maxPrice" oninput="aplicarFiltros()" placeholder="Máx R$" class="w-1/2 p-1.5 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-[10px] outline-none" />
+                        <input type="number" id="minPrice" oninput="aplicarFiltrosComDebounce()" placeholder="Mín R$" class="w-1/2 p-1.5 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-[10px] outline-none" />
+                        <input type="number" id="maxPrice" oninput="aplicarFiltrosComDebounce()" placeholder="Máx R$" class="w-1/2 p-1.5 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-[10px] outline-none" />
                     </div>
-                    <input type="text" id="searchInput" oninput="aplicarFiltros()" placeholder="Busca... (TAM:35 ou COR:PRETO)" class="flex-1 p-1.5 rounded-lg bg-slate-900/60 border border-indigo-400/30 text-white font-bold text-[10px] outline-none focus:border-amber-400" />
+                    <input type="text" id="searchInput" oninput="aplicarFiltrosComDebounce()" placeholder="Busca... (TAM:35 ou COR:PRETO)" class="flex-1 p-1.5 rounded-lg bg-slate-900/60 border border-indigo-400/30 text-white font-bold text-[10px] outline-none focus:border-amber-400" />
                 </div>
 
                 <div class="flex gap-1 overflow-x-auto pb-1 custom-scroll items-center">
@@ -103,6 +103,13 @@
         let anoAtivo = null;
         let modoFiltroQtd = 'min';
         let valorFiltroQtd = 0;
+        let timerBusca;
+
+        // FUNÇÃO DE FLUIDEZ: Debounce
+        function aplicarFiltrosComDebounce() {
+            clearTimeout(timerBusca);
+            timerBusca = setTimeout(aplicarFiltros, 250);
+        }
 
         function verificarLogin() {
             if (document.getElementById('passInput').value.toLowerCase() === 'aca') {
@@ -167,7 +174,6 @@
             const minP = parseFloat(document.getElementById('minPrice').value) || 0;
             const maxP = parseFloat(document.getElementById('maxPrice').value) || Infinity;
 
-            // 1. FILTRAGEM INICIAL (Busca, Preço, Ano, Tam, Cor)
             let listaBase = dadosEstoque.filter(i => {
                 const tamItem = String(i.tam || '').trim().toUpperCase();
                 const corItem = String(i.cor || '').trim().toUpperCase();
@@ -183,20 +189,17 @@
                 return matchTexto && matchPreco && matchAno && matchTam && matchCor && i.total > 0;
             });
 
-            // 2. CÁLCULO DE SOMA POR MODELO (Para Peça Única)
             const somaPorNCE = {};
             listaBase.forEach(item => {
                 if (!somaPorNCE[item.nce]) somaPorNCE[item.nce] = 0;
                 somaPorNCE[item.nce] += item.total;
             });
 
-            // 3. FILTRAGEM FINAL POR QUANTIDADE (Peça Única / +2 Pares)
             let listaFiltradaFinal = listaBase.filter(i => {
                 const totalModelo = somaPorNCE[i.nce];
                 return modoFiltroQtd === 'exato' ? totalModelo === valorFiltroQtd : totalModelo >= valorFiltroQtd;
             });
 
-            // 4. ATUALIZAR RESUMO E RENDERIZAR
             if (modoAmostra) {
                 const grupos = {};
                 listaFiltradaFinal.forEach(item => {
@@ -219,7 +222,11 @@
         function renderEstoque(lista) {
             document.getElementById('tableHeader').innerHTML = `<tr><th class="w-14">NCE</th><th class="w-8">TAM</th><th class="text-left">DESCRIÇÃO / COR</th><th class="w-14">ESTOQUE</th><th class="w-20 text-right pr-2">PREÇO</th></tr>`;
             let html = "", ultimoNCE = "", currentClass = "group-bg-1";
-            lista.forEach(i => {
+            
+            // FUNÇÃO DE FLUIDEZ: Renderizar apenas os primeiros 500 para não travar o celular
+            const listaVisual = lista.slice(0, 500);
+
+            listaVisual.forEach(i => {
                 if (i.nce !== ultimoNCE) { currentClass = (currentClass === "group-bg-1") ? "group-bg-2" : "group-bg-1"; ultimoNCE = i.nce; }
                 html += `<tr class="${currentClass} border-b border-slate-100">
                     <td class="p-2 text-center font-bold text-indigo-700">${i.nce}</td>
@@ -238,7 +245,11 @@
         function renderAmostras(lista) {
             document.getElementById('tableHeader').innerHTML = `<tr><th class="w-14">NCE</th><th class="text-left">DESCRIÇÃO / COR</th><th class="w-10 text-center">TAM</th><th class="w-10 text-center">TOT</th><th class="w-20 text-right pr-2">VALOR</th></tr>`;
             let html = "", ultimoNCE = "", currentClass = "group-bg-1";
-            lista.forEach(i => {
+            
+            // FUNÇÃO DE FLUIDEZ: Renderizar apenas os primeiros 500
+            const listaVisual = lista.slice(0, 500);
+
+            listaVisual.forEach(i => {
                 if (i.nce !== ultimoNCE) { currentClass = (currentClass === "group-bg-1") ? "group-bg-2" : "group-bg-1"; ultimoNCE = i.nce; }
                 html += `<tr class="${currentClass} border-b border-slate-200">
                     <td class="p-3 text-center font-bold text-indigo-900">${i.nce}</td>
@@ -255,9 +266,11 @@
         }
 
         function atualizarResumo(lista, isAmostra) {
+            // Aqui NÃO usamos o slice(0,500), pois queremos a soma do ESTOQUE REAL COMPLETO
+            // Independente de quantas linhas aparecem na tela, o valor no topo será o total absoluto.
             let p = 0, v = 0;
             if(isAmostra) { 
-                p = lista.length; // Em amostras, contamos quantos modelos existem
+                p = lista.length; 
                 lista.forEach(i => v += (i.qtdTotalCor * i.unitario)); 
             } else { 
                 lista.forEach(i => { 
