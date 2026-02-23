@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ACA - Estoque</title>
+    <title>ACA - Estoque Corrigido</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -150,60 +150,56 @@
 
         function aplicarFiltros() {
             let buscaFull = document.getElementById('searchInput').value.toUpperCase();
-            
-            // Lógica robusta para TAM: e COR:
             let filtroTam = null;
             let filtroCor = null;
             
             if (buscaFull.includes('TAM:')) {
-                // Pega o que vem depois de TAM: até o próximo espaço
                 const partes = buscaFull.split('TAM:');
                 if(partes[1]) filtroTam = partes[1].split(' ')[0].trim();
             }
-            
             if (buscaFull.includes('COR:')) {
                 const partes = buscaFull.split('COR:');
                 if(partes[1]) filtroCor = partes[1].split(' ')[0].trim();
             }
 
-            // Remove as tags da busca de texto para não dar conflito
             let buscaTexto = buscaFull.replace(/TAM:\S+/g, '').replace(/COR:\S+/g, '').trim().toLowerCase();
             const termos = buscaTexto.split(' ').filter(t => t !== '');
-
             const minP = parseFloat(document.getElementById('minPrice').value) || 0;
             const maxP = parseFloat(document.getElementById('maxPrice').value) || Infinity;
 
-            // Filtro Principal
+            // 1. FILTRAGEM INICIAL (Busca, Preço, Ano, Tam, Cor)
             let listaBase = dadosEstoque.filter(i => {
                 const tamItem = String(i.tam || '').trim().toUpperCase();
                 const corItem = String(i.cor || '').trim().toUpperCase();
                 const descItem = String(i.desc || '').toLowerCase();
                 const nceItem = String(i.nce || '').toLowerCase();
 
-                // 1. Match de Texto (Desc ou NCE ou Cor)
                 const matchTexto = termos.every(t => descItem.includes(t) || nceItem.includes(t) || corItem.toLowerCase().includes(t));
-                
-                // 2. Match de Preço e Ano
                 const matchPreco = i.unitario >= minP && i.unitario <= maxP;
                 const matchAno = anoAtivo ? i.ano === anoAtivo : true;
-                
-                // 3. Match Específico de TAM e COR (Usa IGUALDADE para tamanho)
                 const matchTam = filtroTam ? (tamItem === filtroTam) : true;
                 const matchCor = filtroCor ? corItem.includes(filtroCor) : true;
 
                 return matchTexto && matchPreco && matchAno && matchTam && matchCor && i.total > 0;
             });
 
-            // Lógica Peça Única por NCE
+            // 2. CÁLCULO DE SOMA POR MODELO (Para Peça Única)
             const somaPorNCE = {};
             listaBase.forEach(item => {
                 if (!somaPorNCE[item.nce]) somaPorNCE[item.nce] = 0;
                 somaPorNCE[item.nce] += item.total;
             });
 
+            // 3. FILTRAGEM FINAL POR QUANTIDADE (Peça Única / +2 Pares)
+            let listaFiltradaFinal = listaBase.filter(i => {
+                const totalModelo = somaPorNCE[i.nce];
+                return modoFiltroQtd === 'exato' ? totalModelo === valorFiltroQtd : totalModelo >= valorFiltroQtd;
+            });
+
+            // 4. ATUALIZAR RESUMO E RENDERIZAR
             if (modoAmostra) {
                 const grupos = {};
-                listaBase.forEach(item => {
+                listaFiltradaFinal.forEach(item => {
                     const chave = `${item.nce}_${item.cor}`;
                     if (!grupos[chave]) grupos[chave] = [];
                     grupos[chave].push(item);
@@ -212,16 +208,11 @@
                     itens.sort((a, b) => parseInt(a.tam) - parseInt(b.tam));
                     return { ...itens[0], qtdTotalCor: itens.reduce((acc, cur) => acc + cur.total, 0) };
                 });
-                listaAmostras = listaAmostras.filter(a => modoFiltroQtd === 'exato' ? a.qtdTotalCor === valorFiltroQtd : a.qtdTotalCor >= valorFiltroQtd);
                 renderAmostras(listaAmostras);
                 atualizarResumo(listaAmostras, true);
             } else {
-                let listaFinal = listaBase.filter(i => {
-                    const totalModelo = somaPorNCE[i.nce];
-                    return modoFiltroQtd === 'exato' ? totalModelo === valorFiltroQtd : totalModelo >= valorFiltroQtd;
-                });
-                renderEstoque(listaFinal);
-                atualizarResumo(listaFinal, false);
+                renderEstoque(listaFiltradaFinal);
+                atualizarResumo(listaFiltradaFinal, false);
             }
         }
 
@@ -265,8 +256,15 @@
 
         function atualizarResumo(lista, isAmostra) {
             let p = 0, v = 0;
-            if(isAmostra) { p = lista.length; lista.forEach(i => v += (i.qtdTotalCor * i.unitario)); } 
-            else { lista.forEach(i => { p += i.total; v += (i.total * i.unitario); }); }
+            if(isAmostra) { 
+                p = lista.length; // Em amostras, contamos quantos modelos existem
+                lista.forEach(i => v += (i.qtdTotalCor * i.unitario)); 
+            } else { 
+                lista.forEach(i => { 
+                    p += i.total; 
+                    v += (i.total * i.unitario); 
+                }); 
+            }
             document.getElementById('resumoPecas').textContent = p;
             document.getElementById('resumoValor').textContent = v.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'});
         }
